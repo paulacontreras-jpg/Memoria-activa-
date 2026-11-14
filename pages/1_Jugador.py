@@ -10,7 +10,12 @@ encabezado("🎮", "Jugador", "Ejercita tu memoria: mira, recuerda y repite.")
 
 client, datos = get_cliente()
 
-DIFICULTADES = {"Lenta": "lenta", "Normal": "normal", "Rápida": "rapida"}
+DIFICULTADES = {
+    "Lenta": "lenta",
+    "Normal": "normal",
+    "Rápida": "rapida",
+    "Automática": "auto",
+}
 
 with st.expander("📖 ¿Cómo se juega? (guía rápida)", expanded=True):
     pasos = [
@@ -23,7 +28,7 @@ with st.expander("📖 ¿Cómo se juega? (guía rápida)", expanded=True):
     for col, (n, t, x, c) in zip(cols, pasos):
         col.markdown(paso(n, t, x, c), unsafe_allow_html=True)
     st.markdown(
-        "**Consejo:** cuando quieras parar, pulsa **Terminar y guardar** y tu puntaje "
+        "**Consejo:** cuando quieras parar, pulsa **Terminar** y tu puntaje "
         "quedará registrado."
     )
 
@@ -53,9 +58,15 @@ def en_vivo():
     if not datos["conectado"]:
         st.warning("Sin conexión con el broker MQTT. Recarga la página en unos segundos.")
     st.markdown(tarjeta_estado(ultimo.get("estado")), unsafe_allow_html=True)
+
+    tiempo = ultimo.get("tiempo", 0) / 1000
+    velocidad = ultimo.get("velocidad", 0) / 1000
     c1, c2 = st.columns(2)
     c1.metric("Nivel", ultimo.get("nivel", 0))
     c2.metric("Puntaje", ultimo.get("puntaje", 0))
+    c3, c4 = st.columns(2)
+    c3.metric("Tiempo de respuesta", f"{tiempo:.1f} s" if tiempo > 0 else "—")
+    c4.metric("Duración de cada luz", f"{velocidad:.1f} s" if velocidad > 0 else "—")
 
 
 en_vivo()
@@ -91,12 +102,17 @@ st.select_slider(
 )
 st.caption(
     "**Lenta:** ideal para empezar. **Normal:** un buen ritmo. "
-    "**Rápida:** más reto, y ganas más puntos por cada nivel."
+    "**Rápida:** más reto, y ganas más puntos por cada nivel. "
+    "**Automática:** el juego se adapta a tu ritmo: si respondes rápido se acelera, "
+    "y si necesitas más tiempo se hace más lento."
 )
 
 # --- 4. Voz ---
 st.subheader("4. Usa tu voz (opcional)")
-st.caption("Pulsa el micrófono y di: «empezar», «reiniciar», «terminar», «lenta», «normal» o «rápida».")
+st.caption(
+    "Pulsa el micrófono y di: «empezar», «reiniciar», «terminar», "
+    "«lenta», «normal», «rápida» o «automática»."
+)
 
 dictado = speech_to_text(
     language="es",
@@ -135,6 +151,9 @@ if dictado:
     elif "rapid" in t:
         publicar(TOPIC_COMANDO, "dificultad:rapida")
         st.success(f"Entendí «{dictado}»: dificultad rápida")
+    elif "automat" in t:
+        publicar(TOPIC_COMANDO, "dificultad:auto")
+        st.success(f"Entendí «{dictado}»: dificultad automática")
     else:
         st.warning(f"No entendí «{dictado}». Prueba con «empezar» o «terminar».")
 
@@ -155,7 +174,7 @@ def mis_partidas():
         return
     st.metric("Tu mejor puntaje", max(h["puntaje"] for h in mias))
     st.dataframe(
-        pd.DataFrame(mias)[["partida", "puntaje", "nivel", "dificultad", "resultado"]],
+        pd.DataFrame(mias)[["partida", "puntaje", "nivel", "dificultad", "tiempo_s", "resultado"]],
         hide_index=True,
         use_container_width=True,
     )
