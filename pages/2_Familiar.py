@@ -52,10 +52,16 @@ def seguimiento():
         ultimo = dict(datos["ultimo"])
 
     st.subheader("Seguimiento")
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     c1.metric("Partidas jugadas", len(historial))
     c2.metric("Mejor puntaje", max((h["puntaje"] for h in historial), default=0))
-    c3.metric("Estado actual", ESTADOS.get(ultimo.get("estado"), "Sin datos"))
+    c3, c4 = st.columns(2)
+    tiempos = [h["tiempo_s"] for h in historial if h["tiempo_s"] > 0]
+    c3.metric(
+        "Tiempo de respuesta medio",
+        f"{sum(tiempos) / len(tiempos):.1f} s" if tiempos else "—",
+    )
+    c4.metric("Estado actual", ESTADOS.get(ultimo.get("estado"), "Sin datos"))
 
     if not historial:
         st.info("Aún no hay partidas terminadas. Cuando alguien juegue, aparecerán aquí.")
@@ -76,6 +82,13 @@ def seguimiento():
 
     st.subheader("📈 Evolución del puntaje")
     st.bar_chart(df.set_index("partida")["puntaje"])
+
+    st.subheader("⏱ Tiempo de respuesta por partida (segundos)")
+    st.line_chart(df.set_index("partida")["tiempo_s"])
+    st.caption(
+        "Un tiempo menor indica que el jugador responde más rápido. "
+        "Es solo un seguimiento del juego, no una medida médica."
+    )
 
     st.subheader("📋 Historial de partidas")
     st.dataframe(df, hide_index=True, use_container_width=True)
