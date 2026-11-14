@@ -43,7 +43,14 @@ def get_cliente():
         "lock": threading.Lock(),
         "conectado": False,
         "jugador": "Anónimo",
-        "ultimo": {"estado": "desconocido", "nivel": 0, "puntaje": 0, "dificultad": "normal"},
+        "ultimo": {
+            "estado": "desconocido",
+            "nivel": 0,
+            "puntaje": 0,
+            "dificultad": "normal",
+            "tiempo": 0,
+            "velocidad": 0,
+        },
         "historial": [],
     }
 
@@ -72,6 +79,7 @@ def get_cliente():
                         "puntaje": info.get("puntaje", 0),
                         "nivel": info.get("nivel", 0),
                         "dificultad": info.get("dificultad", "normal"),
+                        "tiempo_s": round(info.get("tiempo", 0) / 1000, 2),
                         "resultado": RESULTADOS[estado],
                     }
                 )
