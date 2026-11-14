@@ -17,7 +17,15 @@ ESTADOS = {
     "mostrando": "Mostrando secuencia",
     "tu_turno": "Turno del jugador",
     "perdio": "Partida terminada",
+    "termino": "Partida terminada",
     "gano": "¡Completó el juego!",
+}
+
+# Estados que cierran una partida y se guardan en el historial
+RESULTADOS = {
+    "perdio": "Perdió",
+    "termino": "Terminó",
+    "gano": "Completó el juego",
 }
 
 
@@ -34,6 +42,7 @@ def get_cliente():
     datos = {
         "lock": threading.Lock(),
         "conectado": False,
+        "jugador": "Anónimo",
         "ultimo": {"estado": "desconocido", "nivel": 0, "puntaje": 0, "dificultad": "normal"},
         "historial": [],
     }
@@ -54,13 +63,16 @@ def get_cliente():
             datos["ultimo"] = info
             # El mensaje retenido es el último estado guardado en el broker:
             # no cuenta como una partida nueva.
-            if info.get("estado") in ("perdio", "gano") and not msg.retain:
+            estado = info.get("estado")
+            if estado in RESULTADOS and not msg.retain:
                 datos["historial"].append(
                     {
                         "partida": len(datos["historial"]) + 1,
+                        "jugador": datos["jugador"],
                         "puntaje": info.get("puntaje", 0),
                         "nivel": info.get("nivel", 0),
                         "dificultad": info.get("dificultad", "normal"),
+                        "resultado": RESULTADOS[estado],
                     }
                 )
 
@@ -76,3 +88,10 @@ def get_cliente():
 def publicar(topic: str, texto: str) -> None:
     client, _ = get_cliente()
     client.publish(topic, limpiar_texto(texto))
+
+
+def set_jugador(nombre: str) -> None:
+    """Guarda quién está jugando, para asignarle el puntaje al terminar."""
+    _, datos = get_cliente()
+    with datos["lock"]:
+        datos["jugador"] = nombre.strip() or "Anónimo"
