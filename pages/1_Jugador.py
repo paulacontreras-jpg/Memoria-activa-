@@ -2,26 +2,43 @@ import pandas as pd
 import streamlit as st
 from streamlit_mic_recorder import speech_to_text
 
-from mqtt_utils import (
-    ESTADOS,
-    TOPIC_COMANDO,
-    get_cliente,
-    limpiar_texto,
-    publicar,
-    set_jugador,
-)
+from estilos import COLORES, aplicar_estilos, encabezado, paso, tarjeta_estado
+from mqtt_utils import TOPIC_COMANDO, get_cliente, limpiar_texto, publicar, set_jugador
 
-st.title("Jugador")
-st.caption("Escribe tu nombre, juega y tu puntaje quedará guardado en el ranking.")
+aplicar_estilos()
+encabezado("🎮", "Jugador", "Ejercita tu memoria: mira, recuerda y repite.")
 
 client, datos = get_cliente()
 
 DIFICULTADES = {"Lenta": "lenta", "Normal": "normal", "Rápida": "rapida"}
 
-nombre = st.text_input("Tu nombre", key="nombre", max_chars=20, placeholder="Por ejemplo: Pau")
+with st.expander("📖 ¿Cómo se juega? (guía rápida)", expanded=True):
+    pasos = [
+        ("1", "Escribe tu nombre", "Así tu puntaje queda guardado en el ranking.", COLORES[0]),
+        ("2", "Pulsa Empezar", "También puedes decir «empezar» con el micrófono.", COLORES[1]),
+        ("3", "Mira y recuerda", "Las luces se encienden en un orden. ¡Memorízalo!", COLORES[2]),
+        ("4", "Repite el orden", "Pulsa los botones del dispositivo con los mismos colores.", COLORES[3]),
+    ]
+    cols = st.columns(4)
+    for col, (n, t, x, c) in zip(cols, pasos):
+        col.markdown(paso(n, t, x, c), unsafe_allow_html=True)
+    st.markdown(
+        "**Consejo:** cuando quieras parar, pulsa **Terminar y guardar** y tu puntaje "
+        "quedará registrado."
+    )
+
+# --- 1. Nombre ---
+st.subheader("1. Escribe tu nombre")
+nombre = st.text_input(
+    "Tu nombre",
+    key="nombre",
+    max_chars=20,
+    placeholder="Por ejemplo: Pau",
+    label_visibility="collapsed",
+)
 listo = bool(nombre.strip())
 if not listo:
-    st.info("Escribe tu nombre para poder jugar.")
+    st.info("Escribe tu nombre para poder empezar a jugar.")
 
 
 def cambiar_dificultad():
@@ -35,24 +52,16 @@ def en_vivo():
         ultimo = dict(datos["ultimo"])
     if not datos["conectado"]:
         st.warning("Sin conexión con el broker MQTT. Recarga la página en unos segundos.")
-    c1, c2, c3 = st.columns(3)
+    st.markdown(tarjeta_estado(ultimo.get("estado")), unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
     c1.metric("Nivel", ultimo.get("nivel", 0))
     c2.metric("Puntaje", ultimo.get("puntaje", 0))
-    c3.metric("Estado", ESTADOS.get(ultimo.get("estado"), "Sin datos"))
-    if ultimo.get("estado") == "perdio":
-        st.info("¡Casi lo logras! Pulsa Empezar para intentarlo de nuevo.")
-    elif ultimo.get("estado") == "termino":
-        st.success("Partida terminada: tu puntaje quedó guardado.")
-    elif ultimo.get("estado") == "gano":
-        st.success("¡Increíble, completaste todos los niveles!")
 
 
 en_vivo()
 
-st.divider()
-
-# --- Botones ---
-st.subheader("Controles")
+# --- 2. Controles ---
+st.subheader("2. Controla la partida")
 col1, col2, col3 = st.columns(3)
 if col1.button("▶ Empezar", type="primary", use_container_width=True, disabled=not listo):
     set_jugador(nombre)
@@ -62,25 +71,32 @@ if col2.button("↻ Reiniciar", use_container_width=True, disabled=not listo):
     set_jugador(nombre)
     publicar(TOPIC_COMANDO, "reiniciar")
     st.toast("Partida reiniciada")
-if col3.button("■ Terminar y guardar", use_container_width=True, disabled=not listo):
+if col3.button("■ Terminar", use_container_width=True, disabled=not listo):
     publicar(TOPIC_COMANDO, "terminar")
     st.toast("Terminando la partida...")
+st.caption(
+    "**Empezar:** comienza una partida nueva. **Reiniciar:** vuelve a empezar desde el nivel 1. "
+    "**Terminar:** cierra la partida y guarda tu puntaje."
+)
 
+# --- 3. Dificultad ---
+st.subheader("3. Elige la dificultad")
 st.select_slider(
-    "Dificultad (velocidad de la secuencia)",
+    "Dificultad",
     options=list(DIFICULTADES),
     value="Normal",
     key="dif",
     on_change=cambiar_dificultad,
+    label_visibility="collapsed",
 )
-
-st.divider()
-
-# --- Voz ---
-st.subheader("Control por voz")
 st.caption(
-    "Di «empezar», «reiniciar», «terminar» o una dificultad: «lenta», «normal» o «rápida»."
+    "**Lenta:** ideal para empezar. **Normal:** un buen ritmo. "
+    "**Rápida:** más reto, y ganas más puntos por cada nivel."
 )
+
+# --- 4. Voz ---
+st.subheader("4. Usa tu voz (opcional)")
+st.caption("Pulsa el micrófono y di: «empezar», «reiniciar», «terminar», «lenta», «normal» o «rápida».")
 
 dictado = speech_to_text(
     language="es",
@@ -133,9 +149,9 @@ def mis_partidas():
         return
     with datos["lock"]:
         mias = [h for h in datos["historial"] if h["jugador"].lower() == n.lower()]
-    st.subheader(f"Partidas de {n}")
+    st.subheader(f"🏅 Tus partidas, {n}")
     if not mias:
-        st.caption("Aún no tienes partidas guardadas.")
+        st.caption("Aún no tienes partidas guardadas. ¡Juega una y aparecerá aquí!")
         return
     st.metric("Tu mejor puntaje", max(h["puntaje"] for h in mias))
     st.dataframe(
