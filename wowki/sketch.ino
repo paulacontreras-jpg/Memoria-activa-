@@ -1,6 +1,7 @@
 /*
   Memoria Activa - ESP32 en Wokwi
   Juego de memoria de secuencias (tipo "Simon dice") controlado por MQTT.
+  Mide el tiempo de reaccion del jugador y puede adaptar la velocidad.
 */
 
 #include <WiFi.h>
@@ -32,6 +33,10 @@ PubSubClient client(espClient);
 const int MAX_NIVEL = 30;
 const unsigned long TIEMPO_ESPERA = 15000;   // tiempo máximo para pulsar un botón
 
+// Umbrales del modo automático (tiempo medio por pulsación en cada nivel)
+const unsigned long RAPIDO_MS = 1200;   // si responde más rápido, el juego se acelera
+const unsigned long LENTO_MS  = 2500;   // si responde más lento, el juego se hace más lento
+
 int secuencia[MAX_NIVEL];
 int nivel = 0;
 int indiceEntrada = 0;
@@ -39,6 +44,13 @@ int puntaje = 0;
 int velocidad = 500;          // milisegundos que dura cada color
 int multiplicador = 2;        // puntos por nivel según dificultad
 const char* nombreDificultad = "normal";
+bool modoAuto = false;
+
+// Tiempos de reacción
+unsigned long sumaNivel = 0;
+int cuentaNivel = 0;
+unsigned long sumaJuego = 0;
+int cuentaJuego = 0;
 
 enum Estado { ESPERA, TU_TURNO };
 Estado estado = ESPERA;
@@ -84,15 +96,18 @@ void destello(int i, int ms) {
 }
 
 void publicarEstado(const char* nombre) {
-  char buf[120];
+  char buf[200];
+  int tiempoMedio = (cuentaJuego > 0) ? (int)(sumaJuego / cuentaJuego) : 0;
   snprintf(buf, sizeof(buf),
-           "{\"estado\":\"%s\",\"nivel\":%d,\"puntaje\":%d,\"dificultad\":\"%s\"}",
-           nombre, nivel, puntaje, nombreDificultad);
+           "{\"estado\":\"%s\",\"nivel\":%d,\"puntaje\":%d,\"dificultad\":\"%s\",\"tiempo\":%d,\"velocidad\":%d}",
+           nombre, nivel, puntaje, nombreDificultad, tiempoMedio, velocidad);
   client.publish(TOPIC_ESTADO, buf, true);   // retenido: quien se conecte después ve el último estado
 }
 
 void mostrarSecuencia() {
   estado = ESPERA;   // mientras se muestra, no se leen botones
+  sumaNivel = 0;
+  cuentaNivel = 0;
   pantalla("Nivel " + String(nivel), "Mira bien...");
   publicarEstado("mostrando");
   delay(700);
@@ -111,13 +126,35 @@ void mostrarSecuencia() {
 void iniciarJuego() {
   nivel = 1;
   puntaje = 0;
+  sumaJuego = 0;
+  cuentaJuego = 0;
+  if (modoAuto) velocidad = 600;   // el modo automático siempre arranca a un ritmo medio
   secuencia[0] = random(4);
   mostrarSecuencia();
+}
+
+// En modo automático, ajusta la velocidad según lo rápido que respondió en el nivel
+void ajustarVelocidad() {
+  if (!modoAuto || cuentaNivel == 0) return;
+  unsigned long promedio = sumaNivel / cuentaNivel;
+  if (promedio < RAPIDO_MS) {
+    velocidad = max(250, velocidad - 80);
+  } else if (promedio > LENTO_MS) {
+    velocidad = min(900, velocidad + 80);
+  }
+}
+
+void registrarReaccion(unsigned long ms) {
+  sumaNivel += ms;
+  cuentaNivel++;
+  sumaJuego += ms;
+  cuentaJuego++;
 }
 
 void acierto() {
   estado = ESPERA;
   puntaje += 10 * multiplicador;
+  ajustarVelocidad();
   pantalla("Muy bien!", "Puntaje: " + String(puntaje));
   tono(660, 120);
   delay(60);
@@ -147,7 +184,7 @@ void perdio() {
   pantalla("Puntaje: " + String(puntaje), "Pulsa un boton");
 }
 
-// NUEVO: termina la partida desde la app y guarda el puntaje actual
+// Termina la partida desde la app y guarda el puntaje actual
 void terminarManual() {
   estado = ESPERA;
   pantalla("Partida terminada", "Puntaje: " + String(puntaje));
@@ -183,9 +220,10 @@ void procesarComando(String c) {
   c.toLowerCase();
   if (c.startsWith("dificultad:")) {
     String d = c.substring(11);
-    if (d == "lenta")       { velocidad = 800; multiplicador = 1; nombreDificultad = "lenta"; }
-    else if (d == "normal") { velocidad = 500; multiplicador = 2; nombreDificultad = "normal"; }
-    else if (d == "rapida") { velocidad = 300; multiplicador = 3; nombreDificultad = "rapida"; }
+    if (d == "lenta")       { velocidad = 800; multiplicador = 1; nombreDificultad = "lenta";  modoAuto = false; }
+    else if (d == "normal") { velocidad = 500; multiplicador = 2; nombreDificultad = "normal"; modoAuto = false; }
+    else if (d == "rapida") { velocidad = 300; multiplicador = 3; nombreDificultad = "rapida"; modoAuto = false; }
+    else if (d == "auto")   { velocidad = 600; multiplicador = 2; nombreDificultad = "auto";   modoAuto = true; }
     else return;
     if (estado == ESPERA) {
       pantalla("Dificultad:", d);
@@ -323,9 +361,11 @@ void loop() {
     }
   } else if (estado == TU_TURNO) {
     if (b >= 0) {
+      unsigned long reaccion = millis() - inicioTurno;   // tiempo desde que pudo responder
       destello(b, 250);
       esperarSoltar(b);
       if (b == secuencia[indiceEntrada]) {
+        registrarReaccion(reaccion);
         indiceEntrada++;
         inicioTurno = millis();
         if (indiceEntrada == nivel) acierto();
