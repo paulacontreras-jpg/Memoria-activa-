@@ -147,6 +147,18 @@ void perdio() {
   pantalla("Puntaje: " + String(puntaje), "Pulsa un boton");
 }
 
+// NUEVO: termina la partida desde la app y guarda el puntaje actual
+void terminarManual() {
+  estado = ESPERA;
+  pantalla("Partida terminada", "Puntaje: " + String(puntaje));
+  tono(523, 150);
+  delay(60);
+  tono(392, 250);
+  publicarEstado("termino");
+  delay(2000);
+  pantalla("Puntaje: " + String(puntaje), "Pulsa un boton");
+}
+
 // ---------- Botones ----------
 int leerBoton() {
   for (int i = 0; i < 4; i++) {
@@ -181,6 +193,8 @@ void procesarComando(String c) {
     }
   } else if (c == "iniciar" || c == "reiniciar") {
     iniciarJuego();
+  } else if (c == "terminar") {
+    if (estado == TU_TURNO) terminarManual();
   }
 }
 
