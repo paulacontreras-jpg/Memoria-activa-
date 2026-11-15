@@ -362,10 +362,12 @@ void loop() {
   } else if (estado == TU_TURNO) {
     if (b >= 0) {
       unsigned long reaccion = millis() - inicioTurno;   // tiempo desde que pudo responder
+      registrarReaccion(reaccion);                       // cuenta aciertos y errores
+      Serial.print("Reaccion (ms): ");
+      Serial.println(reaccion);
       destello(b, 250);
       esperarSoltar(b);
       if (b == secuencia[indiceEntrada]) {
-        registrarReaccion(reaccion);
         indiceEntrada++;
         inicioTurno = millis();
         if (indiceEntrada == nivel) acierto();
