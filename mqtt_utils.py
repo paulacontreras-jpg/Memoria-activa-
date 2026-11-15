@@ -1,6 +1,7 @@
 import json
 import random
 import threading
+import time
 import unicodedata
 
 import paho.mqtt.client as mqtt
@@ -43,6 +44,7 @@ def get_cliente():
         "lock": threading.Lock(),
         "conectado": False,
         "jugador": "Anónimo",
+        "mensaje": {"texto": "", "hora": 0.0},
         "ultimo": {
             "estado": "desconocido",
             "nivel": 0,
@@ -94,7 +96,11 @@ def get_cliente():
 
 
 def publicar(topic: str, texto: str) -> None:
-    client, _ = get_cliente()
+    client, datos = get_cliente()
+    if topic == TOPIC_MENSAJE:
+        # Se recuerda el último mensaje (con tildes) para mostrarlo en la página del jugador
+        with datos["lock"]:
+            datos["mensaje"] = {"texto": texto, "hora": time.time()}
     client.publish(topic, limpiar_texto(texto))
 
 
