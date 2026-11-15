@@ -1,8 +1,11 @@
+import time
+from html import escape
+
 import pandas as pd
 import streamlit as st
 from streamlit_mic_recorder import speech_to_text
 
-from estilos import COLORES, aplicar_estilos, encabezado, paso, tarjeta_estado
+from estilos import COLORES, aplicar_estilos, encabezado, paso, pantallita, tarjeta_estado
 from mqtt_utils import TOPIC_COMANDO, get_cliente, limpiar_texto, publicar, set_jugador
 
 aplicar_estilos()
@@ -17,11 +20,22 @@ DIFICULTADES = {
     "Automática": "auto",
 }
 
-with st.expander("📖 ¿Cómo se juega? (guía rápida)", expanded=True):
+# --- Cómo saber cuándo pulsar (siempre visible) ---
+st.subheader("¿Cómo saber cuándo pulsar?")
+semaforo = [
+    ("1", "Mira y escucha", "El dispositivo muestra la secuencia con luces y notas sueltas. Todavía no pulses.", "#E53935"),
+    ("2", "Espera el aviso", "Cuando termina, suena una melodía de tres notas y se encienden todas las luces juntas.", "#FDD835"),
+    ("3", "¡Ahora pulsa!", "La pantallita dice «Tu turno». Repite el orden con los botones.", "#43A047"),
+]
+cols = st.columns(3)
+for col, (n, t, x, c) in zip(cols, semaforo):
+    col.markdown(paso(n, t, x, c), unsafe_allow_html=True)
+
+with st.expander("📖 Guía rápida del juego", expanded=False):
     pasos = [
         ("1", "Escribe tu nombre", "Así tu puntaje queda guardado en el ranking.", COLORES[0]),
         ("2", "Pulsa Empezar", "También puedes decir «empezar» con el micrófono.", COLORES[1]),
-        ("3", "Mira y recuerda", "Las luces se encienden en un orden. ¡Memorízalo!", COLORES[2]),
+        ("3", "Mira, escucha y espera", "No pulses hasta que suene la melodía de aviso.", COLORES[2]),
         ("4", "Repite el orden", "Pulsa los botones del dispositivo con los mismos colores.", COLORES[3]),
     ]
     cols = st.columns(4)
@@ -50,20 +64,58 @@ def cambiar_dificultad():
     publicar(TOPIC_COMANDO, f"dificultad:{DIFICULTADES[st.session_state.dif]}")
 
 
+def lineas_pantallita(estado, nivel, puntaje):
+    """Mismo texto que muestra la pantalla LCD del dispositivo (16 letras por línea)."""
+    if estado == "mostrando":
+        return f"Nivel {nivel}", "Mira y escucha"
+    if estado == "tu_turno":
+        return f"Nivel {nivel}", "Tu turno: pulsa"
+    if estado == "perdio":
+        return "Casi lo logras!", f"Puntaje: {puntaje}"
+    if estado == "termino":
+        return "Partida guardada", f"Puntaje: {puntaje}"
+    if estado == "gano":
+        return "Increible!", "Completaste todo"
+    if estado == "espera":
+        return "Memoria Activa", "Pulsa un boton"
+    return "Conectando...", ""
+
+
 # --- Estado en vivo ---
 @st.fragment(run_every=1)
 def en_vivo():
     with datos["lock"]:
         ultimo = dict(datos["ultimo"])
+        mensaje = dict(datos.get("mensaje", {}))
     if not datos["conectado"]:
         st.warning("Sin conexión con el broker MQTT. Recarga la página en unos segundos.")
-    st.markdown(tarjeta_estado(ultimo.get("estado")), unsafe_allow_html=True)
+
+    estado = ultimo.get("estado")
+    nivel = ultimo.get("nivel", 0)
+    puntaje = ultimo.get("puntaje", 0)
+
+    st.markdown(tarjeta_estado(estado), unsafe_allow_html=True)
+
+    st.markdown("**📟 Pantallita del dispositivo**")
+    l1, l2 = lineas_pantallita(estado, nivel, puntaje)
+    st.markdown(pantallita(l1, l2), unsafe_allow_html=True)
+    st.caption(
+        "Es lo mismo que ves en la pantalla pequeña del circuito: "
+        "ahí aparecen tu nivel y los mensajes de tu familia."
+    )
+
+    if mensaje.get("texto") and time.time() - mensaje.get("hora", 0) < 300:
+        st.markdown(
+            f'<div class="mensaje-familia">💬 <b>Mensaje de tu familia:</b> '
+            f'{escape(mensaje["texto"])}</div>',
+            unsafe_allow_html=True,
+        )
 
     tiempo = ultimo.get("tiempo", 0) / 1000
     velocidad = ultimo.get("velocidad", 0) / 1000
     c1, c2 = st.columns(2)
-    c1.metric("Nivel", ultimo.get("nivel", 0))
-    c2.metric("Puntaje", ultimo.get("puntaje", 0))
+    c1.metric("Nivel", nivel)
+    c2.metric("Puntaje", puntaje)
     c3, c4 = st.columns(2)
     c3.metric("Tiempo de respuesta", f"{tiempo:.1f} s" if tiempo > 0 else "—")
     c4.metric("Duración de cada luz", f"{velocidad:.1f} s" if velocidad > 0 else "—")
