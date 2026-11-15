@@ -61,15 +61,26 @@ h3 { font-size: 1.7rem !important; color: #2F6F73; }
 .estado-icono { font-size: 2.8rem; }
 .estado-titulo { font-size: 1.6rem; font-weight: 800; }
 .estado-texto { font-size: 1.15rem; }
+
+.lcd {
+    background: #1E3A2F; color: #B9F6CA; font-family: 'Courier New', monospace;
+    font-size: 1.7rem; font-weight: 700; letter-spacing: 2px; line-height: 1.6;
+    padding: 1rem 1.3rem; border-radius: 14px; border: 6px solid #555555;
+    margin: 0.3rem 0 0.4rem;
+}
+.mensaje-familia {
+    background: #E3F2FD; border-left: 8px solid #1E88E5; padding: 0.9rem 1.2rem;
+    border-radius: 12px; font-size: 1.25rem; margin: 0.6rem 0 1rem;
+}
 </style>
 """
 
 # clave -> (icono, título, texto, color de fondo, color del borde)
 ESTADOS_AMIGABLES = {
-    "espera": ("🟢", "Listo para jugar", "Escribe tu nombre y pulsa Empezar.", "#E8F5E9", "#43A047"),
-    "mostrando": ("👀", "Mira con atención", "Observa las luces y los sonidos del dispositivo.", "#E3F2FD", "#1E88E5"),
-    "tu_turno": ("👆", "¡Es tu turno!", "Pulsa los botones en el mismo orden de las luces.", "#FFF8E1", "#F0B400"),
-    "perdio": ("💪", "¡Casi lo logras!", "Pulsa Empezar para intentarlo otra vez.", "#FDECEA", "#E53935"),
+    "espera": ("🎮", "Listo para jugar", "Escribe tu nombre y pulsa Empezar.", "#E3F2FD", "#1E88E5"),
+    "mostrando": ("🔴", "Espera y escucha", "No pulses todavía. Cuando termine la melodía de aviso, será tu turno.", "#FDECEA", "#E53935"),
+    "tu_turno": ("🟢", "¡Ahora sí, pulsa!", "Repite el orden de las luces con los botones del dispositivo.", "#E8F5E9", "#43A047"),
+    "perdio": ("💪", "¡Casi lo logras!", "Pulsa Empezar para intentarlo otra vez.", "#FFF8E1", "#F0B400"),
     "termino": ("✅", "Partida guardada", "Tu puntaje ya está en el ranking.", "#E8F5E9", "#43A047"),
     "gano": ("🏆", "¡Increíble!", "Completaste todos los niveles.", "#FFF8E1", "#F0B400"),
 }
@@ -109,3 +120,8 @@ def tarjeta_estado(clave):
         f'<div><div class="estado-titulo">{titulo}</div>'
         f'<div class="estado-texto">{texto}</div></div></div>'
     )
+
+
+def pantallita(linea1, linea2):
+    """Réplica de la pantalla LCD del dispositivo."""
+    return f'<div class="lcd">{linea1}<br>{linea2}&nbsp;</div>'
