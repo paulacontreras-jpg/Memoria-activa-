@@ -1,5 +1,6 @@
 import streamlit as st
 
+from dispositivo import mostrar_dispositivo
 from estilos import COLORES, aviso, encabezado, paso
 
 encabezado("🧠", "Memoria Activa", "Ejercita tu memoria jugando, acompañado por tu familia.")
@@ -8,6 +9,9 @@ st.write(
     "Un juego sencillo de luces y sonidos: el dispositivo te muestra una secuencia "
     "de colores y tú la repites. Cada vez que aciertas, la secuencia crece un poquito."
 )
+
+st.subheader("Conoce tu dispositivo")
+mostrar_dispositivo()
 
 st.subheader("¿Cómo funciona?")
 pasos = [
