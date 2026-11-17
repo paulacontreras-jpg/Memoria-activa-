@@ -7,6 +7,7 @@ from streamlit_mic_recorder import speech_to_text
 
 from estilos import COLORES, aplicar_estilos, encabezado, paso, pantallita, tarjeta_estado
 from mqtt_utils import TOPIC_COMANDO, get_cliente, limpiar_texto, publicar, set_jugador
+from dispositivo import mostrar_dispositivo
 
 aplicar_estilos()
 encabezado("🎮", "Jugador", "Ejercita tu memoria: mira, recuerda y repite.")
