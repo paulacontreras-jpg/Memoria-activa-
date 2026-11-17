@@ -21,6 +21,8 @@ DIFICULTADES = {
     "Automática": "auto",
 }
 
+st.subheader("Conoce tu dispositivo")
+mostrar_dispositivo()
 # --- Cómo saber cuándo pulsar (siempre visible) ---
 st.subheader("¿Cómo saber cuándo pulsar?")
 semaforo = [
